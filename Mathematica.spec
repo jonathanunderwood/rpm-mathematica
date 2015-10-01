@@ -1,3 +1,7 @@
+%global major_ver 10
+%global minor_ver 2
+%global patch_ver 0
+
 # Don't generate any debuginfo packages
 %global debug_package %{nil}
 
@@ -30,19 +34,20 @@ Autoreq: 0
 
 
 Name:		Mathematica
-Version:	9.0.1
+Version:	%{major_ver}.%{minor_ver}.%{patch_ver}
 Release:	1%{?dist}
 Summary:	A platform for scientific, engineering, and mathematical computation
 
 Group:		Applications/Engineering
 License:	Proprietary
-URL:		http://wwww.wolfram.com
-Source0:	%{name}_%{version}_LINUX.sh
+URL:		http://www.wolfram.com
+Source0:	Mathematica_%{version}_LINUX.sh
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 BuildRequires:	prelink
 BuildRequires:  hicolor-icon-theme
 BuildRequires:  desktop-file-utils
+BuildRequires:  symlinks
 
 %description
 Mathematica is a computational software program used in scientific,
@@ -53,17 +58,16 @@ computing.
 %setup -T -c %{name}-%{version}
 
 cp %SOURCE0 .
-chmod +x %{name}_%{version}_LINUX.sh
+chmod +x Mathematica_%{version}_LINUX.sh
 
 %build
 # Nothing to do
 
 %install
-rm -rf $RPM_BUILD_ROOT
-
 %define destdir /opt/%{name}/%{version}
 
-./%{name}_%{version}_LINUX.sh -- \
+#define __spec_install_pre /bin/true
+./Mathematica_%{version}_LINUX.sh -- \
 	-auto -createdir=y -selinux=y -verbose \
 	-targetdir=$RPM_BUILD_ROOT%{destdir} \
  	-execdir=$RPM_BUILD_ROOT%{destdir}/bin
@@ -71,28 +75,15 @@ rm -rf $RPM_BUILD_ROOT
 # Unfortunately the installer script creates absolute symlinks which
 # break once files are moved out of the build root. So, we have to
 # manually recreate them here as relative links
-before=($(echo $RPM_BUILD_ROOT%{destdir}/bin/*))
-
-rm -rf $RPM_BUILD_ROOT%{destdir}/bin/*
-
-for i in `ls $RPM_BUILD_ROOT%{destdir}/Executables` ; do
-    ln -s %{destdir}/Executables/${i} $RPM_BUILD_ROOT%{destdir}/bin/${i}
-done
-
-ln -s %{destdir}/SystemFiles/Kernel/Binaries/Linux-x86-64/MathematicaScript $RPM_BUILD_ROOT%{destdir}/bin/MathematicaScript
-
-after=($(echo $RPM_BUILD_ROOT%{destdir}/bin/*))
-
-if [ "${before[*]}" != "${after[*]}" ] ; then
-   echo "$RPM_BUILD_ROOT%{destdir}/bin doesn't contain all required symlinks after relinking"
-   exit 1
-fi
+symlinks -r -c -v $RPM_BUILD_ROOT%{destdir}
 
 # Fix up prelink error 
 # prelink: # /home/jgu/rpmbuild/BUILDROOT/Mathematica-8.0.1-1.el6.x86_64/opt/Mathematica/8.0.1/SystemFiles/Libraries/Linux/libPHANToMIO.so.4:
 # Could not find one of the dependencies)
 # See eg. http://www.redhat.com/archives/rpm-list/2008-May/msg00011.html
+%if %{major_ver} == 9
 prelink -u $RPM_BUILD_ROOT%{destdir}/SystemFiles/Libraries/Linux/libPHANToMIO.so.4
+%endif
 
 # Fix up hardcoded references to the buildroot in installed files -
 # this silences the check-buildroot script that is ran by rpmbuild
@@ -112,17 +103,21 @@ pushd $RPM_BUILD_ROOT%{destdir}/SystemFiles/Installation
 # to the MimeType entry to prevent desktop-file-validate from failing
 # Note: wolfram-mathematica.desktop (without the 8) doesn't have the
 # correct path for Exec etc
-sed -i -e 's/^[ \t]*//;s/[ \t]*$//' wolfram-mathematica9.desktop 
-sed -i -e '/MimeType/ s/$/;/' wolfram-mathematica9.desktop 
+sed -i -e 's/^[ \t]*//;s/[ \t]*$//' wolfram-mathematica%{major_ver}.desktop 
+sed -i -e '/MimeType/ s/$/;/' wolfram-mathematica%{major_ver}.desktop
 
 # We don't want to create a separate sub-menu just for Mathematica, so
 # we'll add it to the Programming sub-menu
-cat >> wolfram-mathematica9.desktop <<EOF
+cat >> wolfram-mathematica%{major_ver}.desktop <<EOF
 Categories=Development;
 EOF
 
-cp -a wolfram-mathematica9.desktop $RPM_BUILD_ROOT%{_datadir}/applications/wolfram-mathematica9.desktop
-desktop-file-validate $RPM_BUILD_ROOT%{_datadir}/applications/wolfram-mathematica9.desktop
+for f in wolfram-mathematica%{major_ver}.desktop ; do
+    cp -a ${f} $RPM_BUILD_ROOT%{_datadir}/applications/
+    desktop-file-validate $RPM_BUILD_ROOT%{_datadir}/applications/${f}
+done
+#cp -a wolfram-mathematica%{major_ver}.desktop $RPM_BUILD_ROOT%{_datadir}/applications/wolfram-mathematica%{major_ver}.desktop
+#desktop-file-validate $RPM_BUILD_ROOT%{_datadir}/applications/wolfram-mathematica%{major_ver}.desktop
 
 cp -a *.xml $RPM_BUILD_ROOT%{_datadir}/mime/packages/
 popd
@@ -131,17 +126,12 @@ popd
 install -d $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/{32x32,64x64,128x128}/{apps,mimetypes}
 pushd $RPM_BUILD_ROOT%{destdir}/SystemFiles/FrontEnd/SystemResources/X
 for i in "32" "64" "128"; do
-    cp -a Mathematica-${i}.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/apps/wolfram-mathematica.png
-    cp -a MathematicaPlayer-${i}.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/apps/wolfram-mathematicaplayer.png
-    cp -a vnd.wolfram.cdf-${i}.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/mimetypes/application-vnd.wolfram.cdf.png
- 
-    cp -a MathematicaDoc-${i}.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/mimetypes/application-mathematica.png
-    cp -a MathematicaPlayerDoc-${i}.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/mimetypes/application-mathematicaplayer.png
-    cp -a vnd.wolfram.cdfDoc-${i}.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/mimetypes/application-vnd.wolfram.cdf.png
- 
-    cp -a MathematicaDoc-${i}.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/mimetypes/gnome-mime-application-mathematica.png
-    cp -a MathematicaPlayerDoc-${i}.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/mimetypes/gnome-mime-application-mathematicaplayer.png
-    cp -a vnd.wolfram.cdfDoc-${i}.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/mimetypes/gnome-mime-application-vnd.wolfram.cdf.png
+    cp -a App.Mathematica.${i}.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/apps/wolfram-mathematica.png
+    cp -a App.Player.${i}.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/apps/wolfram-mathematicaplayer.png
+
+    for v in "cdf" "mathematica.package" "nb" "player" "wl" ; do
+	cp -a vnd.wolfram.${v}.${i}.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/mimetypes/application-vnd.wolfram.${v}.png
+    done
 done
 popd
 
@@ -158,7 +148,7 @@ EOF
 
 # Create file to add binaries to PATH
 install -d $RPM_BUILD_ROOT%{_sysconfdir}/profile.d
-cat > $RPM_BUILD_ROOT%{_sysconfdir}/profile.d/mathematica.sh << EOF
+cat > $RPM_BUILD_ROOT%{_sysconfdir}/profile.d/mathematica%{major_ver}.sh << EOF
 export PATH=\$PATH:%{destdir}/bin
 EOF
 
@@ -213,6 +203,9 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Thu Oct  1 2015 Jonathan G. Underwood <jonathan.underwood@gmail.com> - 10.2.0-1
+- Update to 10.2.0
+
 * Thu Feb 21 2013 Jonathan G. Underwood <jonathan.underwood@gmail.com> - 9.0.1-1
 - Update to 9.0.1
 - Add /usr/share/Mathematica/{Applications,Autoload} directories to package
