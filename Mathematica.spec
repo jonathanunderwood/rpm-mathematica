@@ -1,5 +1,5 @@
 %global major_ver 10
-%global minor_ver 2
+%global minor_ver 3
 %global patch_ver 0
 
 # Don't generate any debuginfo packages
@@ -21,7 +21,6 @@
 # which keeps the check for occurences of $RPM_BUILD_ROOT in scripts -
 # useful to do this sometimes, but very time consuming
 #
-#define __arch_install_post %{nil}
 %define __arch_install_post /usr/lib/rpm/check-buildroot
 %define __os_install_post %{nil}
 
@@ -42,9 +41,13 @@ Group:		Applications/Engineering
 License:	Proprietary
 URL:		http://www.wolfram.com
 Source0:	Mathematica_%{version}_LINUX.sh
+NoSource:       0
+
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
+%if 0%{?fedora} <= 22
 BuildRequires:	prelink
+%endif
 BuildRequires:  hicolor-icon-theme
 BuildRequires:  desktop-file-utils
 BuildRequires:  symlinks
@@ -81,7 +84,7 @@ symlinks -r -c -v $RPM_BUILD_ROOT%{destdir}
 # prelink: # /home/jgu/rpmbuild/BUILDROOT/Mathematica-8.0.1-1.el6.x86_64/opt/Mathematica/8.0.1/SystemFiles/Libraries/Linux/libPHANToMIO.so.4:
 # Could not find one of the dependencies)
 # See eg. http://www.redhat.com/archives/rpm-list/2008-May/msg00011.html
-%if %{major_ver} == 9
+%if %{major_ver} == 9 && 0%{?fedora} <= 22
 prelink -u $RPM_BUILD_ROOT%{destdir}/SystemFiles/Libraries/Linux/libPHANToMIO.so.4
 %endif
 
@@ -106,20 +109,27 @@ pushd $RPM_BUILD_ROOT%{destdir}/SystemFiles/Installation
 sed -i -e 's/^[ \t]*//;s/[ \t]*$//' wolfram-mathematica%{major_ver}.desktop 
 sed -i -e '/MimeType/ s/$/;/' wolfram-mathematica%{major_ver}.desktop
 
-# We don't want to create a separate sub-menu just for Mathematica, so
-# we'll add it to the Programming sub-menu
-cat >> wolfram-mathematica%{major_ver}.desktop <<EOF
-Categories=Development;
-EOF
-
-for f in wolfram-mathematica%{major_ver}.desktop ; do
-    cp -a ${f} $RPM_BUILD_ROOT%{_datadir}/applications/
-    desktop-file-validate $RPM_BUILD_ROOT%{_datadir}/applications/${f}
-done
-#cp -a wolfram-mathematica%{major_ver}.desktop $RPM_BUILD_ROOT%{_datadir}/applications/wolfram-mathematica%{major_ver}.desktop
-#desktop-file-validate $RPM_BUILD_ROOT%{_datadir}/applications/wolfram-mathematica%{major_ver}.desktop
-
+# Unfortunately the freedesktop.org.xml contains mime entries for
+# mathematica notebook files which set the application type to
+# application/mathematica with an alias to
+# /application/x-mathematica. This overrides the wolfram shipped mime
+# file for notebook files. As a fix, we'll add the
+# application/mathematica and application/x-mathematica mime types to
+# the desktop file. See:
+#
+# https://bugs.freedesktop.org/show_bug.cgi?id=93811
+# https://bugzilla.redhat.com/show_bug.cgi?id=1300723
+#
+# We'll also add the Development category rather than creating a
+# sub-menu just for mathematica
+desktop-file-install wolfram-mathematica%{major_ver}.desktop \
+                     --add-mime-type=application/mathematica \
+                     --add-mime-type=application/x-mathematica \
+                     --add-category=Development \
+                     --dir=$RPM_BUILD_ROOT%{_datadir}/applications
+# Install mime files
 cp -a *.xml $RPM_BUILD_ROOT%{_datadir}/mime/packages/
+
 popd
  
 # Install icons
@@ -186,6 +196,10 @@ fi
 # Update icon cache to reflect removed icons
 /usr/bin/gtk-update-icon-cache %{_datadir}/icons/hicolor &>/dev/null || :
 
+# Update mime-database here too
+/usr/bin/update-mime-database %{?fedora:-n} %{_datadir}/mime &> /dev/null || :
+
+
 %files
 %defattr(-,root,root,-)
 %{destdir}
@@ -203,6 +217,14 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Thu Jan 21 2016 Jonathan G. Underwood <jonathan.underwood@gmail.com> - 10.3.0-1
+- Update to 10.3.0
+- Move to using nosrc
+- Only BR require prelink on Fedora < 23
+- Fix up desktop file to deal with the freedesktop.org defined mime types
+- Clean ups
+- Update mime database in %%posttrans as well as %%post
+
 * Thu Oct  1 2015 Jonathan G. Underwood <jonathan.underwood@gmail.com> - 10.2.0-1
 - Update to 10.2.0
 
