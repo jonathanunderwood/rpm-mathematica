@@ -34,7 +34,7 @@ Autoreq: 0
 
 Name:		Mathematica
 Version:	%{major_ver}.%{minor_ver}.%{patch_ver}
-Release:	2%{?dist}
+Release:	3%{?dist}
 Summary:	A platform for scientific, engineering, and mathematical computation
 
 Group:		Applications/Engineering
@@ -122,6 +122,27 @@ desktop-file-install wolfram-mathematica%{major_ver}.desktop \
                      --add-mime-type=application/x-mathematica \
                      --add-category=Development \
                      --dir=$RPM_BUILD_ROOT%{_datadir}/applications
+
+# Fix the vnd.wolfram.nb.xml file - increase the weight of the glob to
+# 80, and add magic entries for vnd.wolfram.mathematica and
+# application/mathematica
+cat > application-vnd.wolfram.nb.xml <<EOF
+<?xml version="1.0"?>
+<mime-info xmlns='http://www.freedesktop.org/standards/shared-mime-info'>
+  <mime-type type="application/vnd.wolfram.nb">
+    <comment>Wolfram Notebook</comment>
+    <magic priority="80">
+      <match type="string" offset="0:100" value="vnd.wolfram.nb" />
+      <match type="string" offset="0:100" value="vnd.wolfram.mathematica" />
+      <match type="string" offset="0:100" value="application/mathematica" />
+    </magic>
+    <generic-icon name="application-mathematica" />
+    <glob pattern="*.nb" weight="80"/>
+  </mime-type>
+</mime-info>
+EOF
+
+
 # Install mime files
 cp -a *.xml $RPM_BUILD_ROOT%{_datadir}/mime/packages/
 
@@ -223,6 +244,9 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Fri Mar  4 2016 Jonathan G. Underwood <jonathan.underwood@gmail.com> - 10.3.0-3
+- Fix up mime types properly
+
 * Thu Jan 21 2016 Jonathan G. Underwood <jonathan.underwood@gmail.com> - 10.3.0-2
 - Add symlinks for icons for the broken freedesktop mime types
 
