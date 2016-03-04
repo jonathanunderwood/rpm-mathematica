@@ -34,7 +34,7 @@ Autoreq: 0
 
 Name:		Mathematica
 Version:	%{major_ver}.%{minor_ver}.%{patch_ver}
-Release:	1%{?dist}
+Release:	2%{?dist}
 Summary:	A platform for scientific, engineering, and mathematical computation
 
 Group:		Applications/Engineering
@@ -74,11 +74,6 @@ chmod +x Mathematica_%{version}_LINUX.sh
 	-auto -createdir=y -selinux=y -verbose \
 	-targetdir=$RPM_BUILD_ROOT%{destdir} \
  	-execdir=$RPM_BUILD_ROOT%{destdir}/bin
-
-# Unfortunately the installer script creates absolute symlinks which
-# break once files are moved out of the build root. So, we have to
-# manually recreate them here as relative links
-symlinks -r -c -v $RPM_BUILD_ROOT%{destdir}
 
 # Fix up prelink error 
 # prelink: # /home/jgu/rpmbuild/BUILDROOT/Mathematica-8.0.1-1.el6.x86_64/opt/Mathematica/8.0.1/SystemFiles/Libraries/Linux/libPHANToMIO.so.4:
@@ -142,6 +137,11 @@ for i in "32" "64" "128"; do
     for v in "cdf" "mathematica.package" "nb" "player" "wl" ; do
 	cp -a vnd.wolfram.${v}.${i}.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/mimetypes/application-vnd.wolfram.${v}.png
     done
+
+    # We also need to have icons for the broken freedesktop mime types (see above). Sigh.
+    pushd $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/${i}x${i}/mimetypes
+    ln -s application-vnd.wolfram.${v}.png application-mathematica.png
+    popd
 done
 popd
 
@@ -165,6 +165,12 @@ EOF
 # Create directories for Mathematica system wide package installation
 # (corresponding to $BaseDirectory etc)
 install -d $RPM_BUILD_ROOT%{_datadir}/Mathematica/{Applications,Autoload}
+
+# Unfortunately the installer script creates absolute symlinks which
+# break once files are moved out of the build root. So, we have to
+# manually recreate them here as relative links
+symlinks -r -c -v $RPM_BUILD_ROOT%{destdir}
+
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -217,6 +223,9 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Thu Jan 21 2016 Jonathan G. Underwood <jonathan.underwood@gmail.com> - 10.3.0-2
+- Add symlinks for icons for the broken freedesktop mime types
+
 * Thu Jan 21 2016 Jonathan G. Underwood <jonathan.underwood@gmail.com> - 10.3.0-1
 - Update to 10.3.0
 - Move to using nosrc
